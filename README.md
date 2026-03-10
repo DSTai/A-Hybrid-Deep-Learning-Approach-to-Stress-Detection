@@ -1,5 +1,4 @@
-# A Hybrid Deep Learning Approach to Stress Detection
-### Integrating CNN-LSTM with Reinforcement Learning and Active Learning
+# A Hybrid Deep Learning Approach to Stress Detection: Integrating CNN-LSTM with Reinforcement Learning and Active Learning
 
 ![Python](https://img.shields.io/badge/Python-DeepLearning-blue)
 ![Framework](https://img.shields.io/badge/Framework-TensorFlow-green)
@@ -108,7 +107,7 @@ pip install -r requirements.txt
 
 Run training script
 ```
-python src/train.py
+python wesad-chest-resp-imb-hyb-dqn-td-reward-2labels-al-l1-norm.py
 ```
 # 💡 Applications
 
