@@ -83,16 +83,13 @@ The hybrid learning framework improves performance by combining **deep temporal 
 A-Hybrid-Deep-Learning-Approach-to-Stress-Detection
 │
 ├── src
-│ ├── cnn_lstm_model.py
-│ ├── ddqn_agent.py
-│ ├── active_learning.py
-│ └── train.py
+│    └── Model
+│          ├── wesad-chest-resp-hybrid.py
+│          ├── wesad-chest-resp-imb-hyb-al.py
+│          ├── wesad-chest-resp-imb-hyb-dqn-td-reward-2labels-al-l1-norm.py
+│          ├── wesad-chest-resp-imb-hyb-dqn.py
+│          └── wesad-chest-resp.py
 │
-├── experiments
-│ └── training_results
-│
-├── paper
-│ └── preprint.pdf
 │
 ├── requirements.txt
 └── README.md
