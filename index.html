@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stress Detection Dashboard</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f13;
+      --bg2: #17171e;
+      --bg3: #1e1e28;
+      --border: rgba(255,255,255,0.08);
+      --border2: rgba(255,255,255,0.14);
+      --text: #e8e6f0;
+      --muted: #7b7990;
+      --stress: #e05a3a;
+      --stress-bg: rgba(224,90,58,0.12);
+      --stress-border: rgba(224,90,58,0.3);
+      --ok: #1db87a;
+      --ok-bg: rgba(29,184,122,0.12);
+      --ok-border: rgba(29,184,122,0.3);
+      --accent: #7c6af5;
+      --accent-bg: rgba(124,106,245,0.12);
+      --radius: 10px;
+      --radius-sm: 6px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* Layout */
+    .app { display: flex; flex-direction: column; min-height: 100vh; }
+
+    header {
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 28px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .logo-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+      flex-shrink: 0;
+    }
+
+    header h1 { font-size: 15px; font-weight: 600; color: var(--text); letter-spacing: .01em; }
+    header p { font-size: 12px; color: var(--muted); margin-top: 1px; }
+
+    .header-spacer { flex: 1; }
+
+    .pill {
+      font-size: 11px; padding: 3px 10px; border-radius: 20px;
+      background: var(--accent-bg); color: var(--accent);
+      border: 1px solid rgba(124,106,245,0.25);
+    }
+
+    main { flex: 1; padding: 24px 28px; max-width: 1200px; width: 100%; margin: 0 auto; }
+
+    /* Connect panel */
+    .connect-panel {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      margin-bottom: 24px;
+    }
+
+    .connect-panel h2 { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; margin-bottom: 14px; }
+
+    .connect-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+    input[type="text"] {
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 13px;
+      padding: 8px 12px;
+      outline: none;
+      transition: border-color .2s;
+    }
+    input[type="text"]:focus { border-color: var(--accent); }
+    input#url-input { flex: 1; min-width: 200px; }
+    input#user-input { width: 120px; }
+
+    button {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 500;
+      padding: 8px 18px;
+      cursor: pointer;
+      transition: opacity .2s, transform .1s;
+      white-space: nowrap;
+    }
+    button:hover { opacity: .88; }
+    button:active { transform: scale(.97); }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+
+    .status-line {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .status-line.err { color: var(--stress); }
+    .status-line.ok { color: var(--ok); }
+    .status-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: currentColor; flex-shrink: 0;
+    }
+
+    /* Metrics */
+    .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
+
+    .metric-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+    }
+    .metric-card .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+    .metric-card .value { font-size: 26px; font-weight: 600; color: var(--text); }
+    .metric-card .value.stress { color: var(--stress); }
+    .metric-card .value.ok { color: var(--ok); }
+    .metric-card .value.accent { color: var(--accent); }
+
+    /* Grid layout */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    @media (max-width: 760px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    .panel {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+    }
+
+    .panel-title {
+      font-size: 11px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: .07em; margin-bottom: 14px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+
+    /* Segment viewer */
+    .seg-controls { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .seg-controls label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+    input[type="range"] {
+      flex: 1;
+      accent-color: var(--accent);
+      height: 4px;
+      cursor: pointer;
+    }
+
+    .seg-badge {
+      font-size: 11px; padding: 2px 9px; border-radius: 20px; font-weight: 500;
+      white-space: nowrap;
+    }
+    .seg-badge.stress { background: var(--stress-bg); color: var(--stress); border: 1px solid var(--stress-border); }
+    .seg-badge.ok { background: var(--ok-bg); color: var(--ok); border: 1px solid var(--ok-border); }
+
+    .chart-wrap { position: relative; }
+
+    /* Probability bars */
+    .prob-section { margin-top: 14px; }
+    .prob-row { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; }
+    .prob-label { font-size: 11px; color: var(--muted); width: 78px; flex-shrink: 0; }
+    .prob-track { flex: 1; height: 5px; background: var(--bg3); border-radius: 3px; overflow: hidden; }
+    .prob-fill { height: 100%; border-radius: 3px; transition: width .35s cubic-bezier(.4,0,.2,1); }
+    .prob-val { font-size: 11px; color: var(--muted); width: 38px; text-align: right; flex-shrink: 0; }
+
+    /* Timeline */
+    .timeline-wrap { margin-top: 6px; }
+    .timeline { display: flex; height: 18px; border-radius: 4px; overflow: hidden; gap: 1px; }
+    .tl-seg { flex: 1; min-width: 1px; cursor: pointer; transition: opacity .15s; }
+    .tl-seg:hover { opacity: .7; }
+
+    /* Legend */
+    .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 10px; }
+    .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+    .legend-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+
+    /* Empty state */
+    .empty {
+      text-align: center; padding: 48px 20px;
+      color: var(--muted); font-size: 13px;
+    }
+    .empty svg { margin-bottom: 12px; opacity: .3; }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo-dot"></div>
+    <div>
+      <h1>Stress Detection Dashboard</h1>
+      <p>Respiratory signal · Model predictions · WESAD dataset</p>
+    </div>
+    <div class="header-spacer"></div>
+    <span class="pill" id="header-pill">Disconnected</span>
+  </header>
+
+  <main>
+    <!-- Connect -->
+    <div class="connect-panel">
+      <h2>Server connection</h2>
+      <div class="connect-row">
+        <input type="text" id="url-input" value="http://localhost:8000" placeholder="http://localhost:8000" />
+        <input type="text" id="user-input" value="user13" placeholder="user13" />
+        <button id="load-btn" onclick="fetchData()">Load data</button>
+      </div>
+      <div class="status-line" id="status-line">
+        <span class="status-dot"></span>
+        <span id="status-text">Nhập URL server và username rồi nhấn Load data.</span>
+      </div>
+    </div>
+
+    <!-- Metrics -->
+    <div class="metrics" id="metrics-row" style="display:none">
+      <div class="metric-card">
+        <div class="label">Total segments</div>
+        <div class="value accent" id="m-total">—</div>
+      </div>
+      <div class="metric-card">
+        <div class="label">Stress</div>
+        <div class="value stress" id="m-stress">—</div>
+      </div>
+      <div class="metric-card">
+        <div class="label">Non-stress</div>
+        <div class="value ok" id="m-nonstress">—</div>
+      </div>
+      <div class="metric-card">
+        <div class="label">Stress rate</div>
+        <div class="value" id="m-rate">—</div>
+      </div>
+      <div class="metric-card">
+        <div class="label">Avg confidence</div>
+        <div class="value" id="m-conf">—</div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div id="charts-area" style="display:none">
+      <div class="grid-2">
+        <!-- Signal viewer -->
+        <div class="panel">
+          <div class="panel-title">
+            <span>Respiratory signal</span>
+            <span id="seg-badge-header" class="seg-badge ok">—</span>
+          </div>
+          <div class="seg-controls">
+            <label>Segment</label>
+            <input type="range" min="0" max="0" value="0" id="seg-slider" oninput="onSlider(this.value)" />
+            <span id="seg-idx" style="font-size:12px; font-weight:600; min-width:32px; color:var(--accent)">0</span>
+          </div>
+          <div class="chart-wrap" style="height:180px">
+            <canvas id="signal-chart" role="img" aria-label="Respiratory signal waveform for selected segment"></canvas>
+          </div>
+          <div class="prob-section">
+            <div class="prob-row">
+              <span class="prob-label">Non-stress</span>
+              <div class="prob-track"><div class="prob-fill" id="pf-ns" style="background:var(--ok)"></div></div>
+              <span class="prob-val" id="pv-ns">—</span>
+            </div>
+            <div class="prob-row">
+              <span class="prob-label">Stress</span>
+              <div class="prob-track"><div class="prob-fill" id="pf-s" style="background:var(--stress)"></div></div>
+              <span class="prob-val" id="pv-s">—</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Overview chart -->
+        <div class="panel">
+          <div class="panel-title">Stress probability — all segments</div>
+          <div class="legend">
+            <div class="legend-item"><div class="legend-dot" style="background:var(--stress)"></div>Stress</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--ok)"></div>Non-stress</div>
+          </div>
+          <div class="chart-wrap" style="height:180px">
+            <canvas id="overview-chart" role="img" aria-label="Bar chart of stress probabilities across all segments"></canvas>
+          </div>
+          <div class="timeline-wrap" style="margin-top:10px">
+            <div style="font-size:11px; color:var(--muted); margin-bottom:5px;">Segment timeline — click to jump</div>
+            <div class="timeline" id="timeline"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Distribution -->
+      <div class="panel" style="margin-bottom:16px">
+        <div class="panel-title">Label distribution</div>
+        <div style="display:flex; gap:16px; align-items:stretch; flex-wrap:wrap">
+          <div style="flex:1; min-width:220px">
+            <div class="chart-wrap" style="height:200px">
+              <canvas id="dist-chart" role="img" aria-label="Pie chart of stress vs non-stress distribution"></canvas>
+            </div>
+          </div>
+          <div style="flex:2; min-width:240px">
+            <div class="chart-wrap" style="height:200px">
+              <canvas id="conf-chart" role="img" aria-label="Histogram of prediction confidence scores"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Empty state -->
+    <div class="empty" id="empty-state">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+        <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+      </svg>
+      <div>Chưa có dữ liệu. Kết nối server để bắt đầu.</div>
+    </div>
+  </main>
+</div>
+
+<script>
+let _data = null;
+let signalChart = null, overviewChart = null, distChart = null, confChart = null;
+
+async function fetchData() {
+  const url = document.getElementById('url-input').value.trim().replace(/\/$/, '');
+  const user = document.getElementById('user-input').value.trim();
+  const btn = document.getElementById('load-btn');
+
+  if (!url || !user) { setStatus('Vui lòng nhập đầy đủ URL và username.', 'err'); return; }
+
+  btn.disabled = true;
+  setStatus('Đang gửi username...', '');
+
+  try {
+    const r1 = await fetch(url + '/get-username', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: user })
+    });
+    if (!r1.ok) { const e = await r1.json().catch(() => ({})); throw new Error(e.detail || r1.statusText); }
+
+    setStatus('Đang tải dữ liệu từ model...', '');
+    const r2 = await fetch(url + '/data-label');
+    if (!r2.ok) { const e = await r2.json().catch(() => ({})); throw new Error(e.detail || r2.statusText); }
+
+    _data = await r2.json();
+    setStatus('Tải thành công — ' + _data.label.length + ' segments.', 'ok');
+    document.getElementById('header-pill').textContent = 'Connected · ' + user;
+    document.getElementById('header-pill').style.background = 'rgba(29,184,122,0.12)';
+    document.getElementById('header-pill').style.color = 'var(--ok)';
+    renderAll();
+  } catch(e) {
+    setStatus('Lỗi: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function setStatus(msg, cls) {
+  const el = document.getElementById('status-line');
+  el.className = 'status-line' + (cls ? ' ' + cls : '');
+  document.getElementById('status-text').textContent = msg;
+}
+
+function renderAll() {
+  const { label, prediction_probability: probs, data: segs } = _data;
+  const total = label.length;
+  const stressN = label.filter(l => l === 1).length;
+  const nsN = total - stressN;
+  const rate = (stressN / total * 100).toFixed(1);
+  const avgConf = (probs.reduce((s, p) => s + Math.max(p[0], p[1]), 0) / total * 100).toFixed(1);
+
+  document.getElementById('m-total').textContent = total;
+  document.getElementById('m-stress').textContent = stressN;
+  document.getElementById('m-nonstress').textContent = nsN;
+  document.getElementById('m-rate').textContent = rate + '%';
+  document.getElementById('m-conf').textContent = avgConf + '%';
+
+  document.getElementById('metrics-row').style.display = 'grid';
+  document.getElementById('charts-area').style.display = 'block';
+  document.getElementById('empty-state').style.display = 'none';
+
+  const slider = document.getElementById('seg-slider');
+  slider.max = total - 1;
+  slider.value = 0;
+
+  renderSegment(0);
+  renderOverview();
+  renderTimeline();
+  renderDist(stressN, nsN);
+  renderConfHist(probs, label);
+}
+
+function onSlider(val) {
+  renderSegment(parseInt(val));
+}
+
+function renderSegment(idx) {
+  const seg = _data.data[idx];
+  const lbl = _data.label[idx];
+  const prob = _data.prediction_probability[idx];
+
+  document.getElementById('seg-idx').textContent = idx;
+  const badge = document.getElementById('seg-badge-header');
+  if (lbl === 1) { badge.textContent = 'Stress'; badge.className = 'seg-badge stress'; }
+  else { badge.textContent = 'Non-stress'; badge.className = 'seg-badge ok'; }
+
+  const color = lbl === 1 ? '#e05a3a' : '#1db87a';
+  const bgColor = lbl === 1 ? 'rgba(224,90,58,0.10)' : 'rgba(29,184,122,0.10)';
+
+  if (signalChart) signalChart.destroy();
+  signalChart = new Chart(document.getElementById('signal-chart'), {
+    type: 'line',
+    data: {
+      labels: seg.map((_, i) => i),
+      datasets: [{ data: seg, borderColor: color, backgroundColor: bgColor, borderWidth: 1.5, pointRadius: 0, fill: true, tension: 0.3 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { maxTicksLimit: 8, font: { size: 10 }, color: '#7b7990' }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { display: false } },
+        y: { ticks: { font: { size: 10 }, color: '#7b7990', callback: v => v.toFixed(0) }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { display: false } }
+      }
+    }
+  });
+
+  const ns = (prob[0] * 100).toFixed(1);
+  const s = (prob[1] * 100).toFixed(1);
+  document.getElementById('pf-ns').style.width = ns + '%';
+  document.getElementById('pf-s').style.width = s + '%';
+  document.getElementById('pv-ns').textContent = ns + '%';
+  document.getElementById('pv-s').textContent = s + '%';
+}
+
+function renderOverview() {
+  const { label, prediction_probability: probs } = _data;
+  const stressProbs = probs.map(p => +(p[1] * 100).toFixed(1));
+  const colors = label.map(l => l === 1 ? '#e05a3a' : '#1db87a');
+
+  if (overviewChart) overviewChart.destroy();
+  overviewChart = new Chart(document.getElementById('overview-chart'), {
+    type: 'bar',
+    data: {
+      labels: label.map((_, i) => i),
+      datasets: [{ data: stressProbs, backgroundColor: colors, borderWidth: 0, barPercentage: 1, categoryPercentage: 0.95 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => 'Stress: ' + c.parsed.y + '%' } } },
+      scales: {
+        x: { ticks: { maxTicksLimit: 10, font: { size: 10 }, color: '#7b7990' }, grid: { display: false }, border: { display: false } },
+        y: { min: 0, max: 100, ticks: { font: { size: 10 }, color: '#7b7990', callback: v => v + '%' }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { display: false } }
+      },
+      onClick: (_, els) => {
+        if (!els.length) return;
+        const i = els[0].index;
+        document.getElementById('seg-slider').value = i;
+        renderSegment(i);
+      }
+    }
+  });
+}
+
+function renderTimeline() {
+  const tl = document.getElementById('timeline');
+  tl.innerHTML = '';
+  _data.label.forEach((l, i) => {
+    const d = document.createElement('div');
+    d.className = 'tl-seg';
+    d.style.background = l === 1 ? '#e05a3a' : '#1db87a';
+    d.title = 'Segment ' + i + ' — ' + (l === 1 ? 'Stress' : 'Non-stress');
+    d.onclick = () => { document.getElementById('seg-slider').value = i; renderSegment(i); };
+    tl.appendChild(d);
+  });
+}
+
+function renderDist(stressN, nsN) {
+  if (distChart) distChart.destroy();
+  distChart = new Chart(document.getElementById('dist-chart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Non-stress', 'Stress'],
+      datasets: [{ data: [nsN, stressN], backgroundColor: ['#1db87a', '#e05a3a'], borderWidth: 0, hoverOffset: 4 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => c.label + ': ' + c.parsed + ' (' + (c.parsed / (stressN + nsN) * 100).toFixed(1) + '%)' } }
+      },
+      cutout: '62%'
+    }
+  });
+}
+
+function renderConfHist(probs, labels) {
+  const bins = Array(10).fill(0);
+  probs.forEach(p => {
+    const conf = Math.max(p[0], p[1]);
+    const b = Math.min(9, Math.floor(conf * 10));
+    bins[b]++;
+  });
+  const binLabels = ['0–10%','10–20%','20–30%','30–40%','40–50%','50–60%','60–70%','70–80%','80–90%','90–100%'];
+
+  if (confChart) confChart.destroy();
+  confChart = new Chart(document.getElementById('conf-chart'), {
+    type: 'bar',
+    data: {
+      labels: binLabels,
+      datasets: [{ label: 'Segments', data: bins, backgroundColor: '#7c6af5', borderWidth: 0, borderRadius: 3 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { font: { size: 9 }, color: '#7b7990', maxRotation: 45 }, grid: { display: false }, border: { display: false } },
+        y: { ticks: { font: { size: 10 }, color: '#7b7990' }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { display: false } }
+      }
+    }
+  });
+}
+</script>
+</body>
+</html>
